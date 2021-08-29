@@ -9,12 +9,12 @@ output: html_document
 ###Three channels include: Shark River Slough, Peace River and Hillsboro Canal####
 ##############Shark River Slough######################################
 ```{r}
-library(dbhydroR)
 library(dplyr)
 library(lubridate)
 library(ggplot2)
 library(segmented)
-#get and name water quality file 
+
+#get and name water quality file: Total Phosphorus (TP) 
 Srs3_TP = read.csv("SRS3-TP_mgl.csv", header =T)
 head(Srs3_TP)
 
@@ -52,7 +52,7 @@ summary(linearModelVar6)
 # Davies test for significant breakpoint in the slope
 TPdavies <- davies.test(linearModelVar6,seg.Z =~Q6,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
 TPdavies 
-#########################
+
 #segmented linear relationship model
 TP.seg <- segmented(linearModelVar6, seg.Z = ~ Q6,it.max=1000)
 #summary(tp.seg1)
@@ -116,7 +116,7 @@ xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(TP~(µmol~L^-1)))+
 TPplot1  
 
 ####################################################
-#select nitrate-nitrite
+# import nitrate-nitrite (NN) and flow file
 Srs3_NN = read.csv("srs3_nn_f_new_mg_L_final_for_plot.csv", header = T)
 
 attach(Srs3_NN)
@@ -223,20 +223,8 @@ nnplot1 <- breakpointplot1+geom_vline(xintercept=nnmy.lines,linetype="dashed", c
     
   #scale_y_continuous(breaks = c(0, 1, 1.5, 2), labels =round(c(10^(0), 10^(1), 10^(1.5), 10^(2)),2))                    
 nnplot1
-
-library(dbhydroR)
-Srs3_SpC= get_hydro(dbkey = "89870",
-         date_min = "2004-01-01", date_max = "2018-12-31")
-#write.csv(Srs3_SpC, file = "srs3_short_SpC.csv", row.names =F)
-Srs3_flow= get_hydro(dbkey = "89858",
-         date_min = "2004-01-01", date_max = "2018-12-31")
-attach(Srs3_flow)
-#write.csv(Srs3_flow, file = "srs3_short_flow.csv", row.names =F)
-
-#write.csv(S31_flow, file = "S31_flow_cleaned.csv",row.names =F)
-#attach(Srs3_SpC)
-head(Srs3_SpC)
-head(Srs3_flow)
+ 
+################################## Specific conductivity(SpC or SC)
 
 Srs3_flow = na.omit(Srs3_flow)
 
@@ -248,7 +236,6 @@ attach(Srs3_SpC)
 Srs3_comb_SpC = merge(Srs3_flow, Srs3_SpC, by ="date")
 
 
-#MR_Con= rename(MR_Con, Specific_Conductivity_umhos_cm = RESULT)
 Srs3_comb_SpC= rename(Srs3_comb_SpC, SpC = "022908295_SCOND_uS/cm" )
 Srs3_comb_SpC= rename(Srs3_comb_SpC,Flow = '022908295_FLOW_cfs')
 #Srs3_comb_SpC
@@ -452,11 +439,9 @@ nnplot1 <- breakpointplot2+geom_vline(xintercept=nnmy.lines,linetype="dashed", c
   #scale_y_continuous(breaks = c(0, 1, 1.5, 2), labels =round(c(10^(0), 10^(1), 10^(1.5), 10^(2)),2))                    
 nnplot1
 dev.off()
-t1 = (mean(Discharge)/mean(NN))* (sd(NN)/sd(Discharge))
- 
-#t = CVc/CVq
-t1
-############################
+
+############################ Chloride (Cl)
+import Chloride and flow file
 Cl_F = read.csv('prb_cl_f_short.csv', header =T)
 
 attach(Cl_F)
@@ -483,7 +468,7 @@ summary(linearModelVar3)
 #turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
 cldavies <- davies.test(linearModelVar3,seg.Z =~Q3,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
 cldavies 
-#########################
+
 
 pscore.test(linearModelVar3, k = 10, alternative = c("two.sided", "less", "greater"),
             values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
@@ -549,11 +534,10 @@ Clplot1 <- breakpointplot3+geom_vline(xintercept=clmy.lines,linetype="dashed", c
 Clplot1
 dev.off()
 
- 
-#t = CVc/CVq
-t3
 
-#############################################################
+
+############################################################# Total suspended solids (TSS)
+#attach alreasy tss and flow file
 tss_F = read.csv('prb_tss_f_short.csv', header =T)
 
 attach(tss_F)
@@ -829,9 +813,10 @@ SpCplot1 <- breakpoint9+geom_vline(xintercept=SpCmy.lines,linetype="dashed", col
                       
 SpCplot1
 
-#################################################################
+################################################################# Turbbidity (Turb) 
+#import turb and flow file
 turb_F =read.csv("prb_turb_F.csv", header=T)
-#TP_F =TP_F[!duplicated(TP_F),]
+
 attach(turb_F)
   
 #turb_F = na.omit(turb_F)
@@ -1460,10 +1445,7 @@ SpCplot1 <- breakpoint9+geom_vline(xintercept=SpCmy.lines,linetype="dashed", col
                       
 SpCplot1
 
-t6 = (mean(Discharge)/mean(SpC))* (sd(SpC)/sd(Discharge))
- 
-#t = CVc/CVq
-t6
+########################################################
 
 S6_TSS = read.csv("s6_final_tss.csv", header =T)
 attach(S6_TSS)
