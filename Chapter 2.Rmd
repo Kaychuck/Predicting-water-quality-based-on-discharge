@@ -5,9 +5,8 @@ date: "8/29/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
 ```
+###Three channels include: Shark River Slough, Peace River and Hillsboro Canal####
 ##############Shark River Slough######################################
 ```{r}
 library(dbhydroR)
@@ -15,22 +14,17 @@ library(dplyr)
 library(lubridate)
 library(ggplot2)
 library(segmented)
-#get and name water quality file from machine
+#get and name water quality file 
 Srs3_TP = read.csv("SRS3-TP_mgl.csv", header =T)
 head(Srs3_TP)
 
-
+Remove NA rows
 Srs3_TP = na.omit(Srs3_TP)
 attach(Srs3_TP)
 
 
-library(tidyverse)
-library(dplyr)
-library(segmented)
-library(ggplot2)
-#library(hrbrthemes)
-
 TP_F1= Srs3_TP
+#convert flow/discharge from cfs to cms
 TP_F1= mutate(TP_F1,
   Discharge = Flow*0.0283 ,
 )
@@ -54,27 +48,26 @@ linearModelVar6 <- lm(C6 ~ Q6, TP_F1)
 #display linear model
 linearModelVar6
 summary(linearModelVar6)
-# Davies test for significant breakpoint
-#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+
+# Davies test for significant breakpoint in the slope
 TPdavies <- davies.test(linearModelVar6,seg.Z =~Q6,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
 TPdavies 
 #########################
-
-pscore.test(linearModelVar6, k = 10, alternative = c("two.sided", "less", "greater"),
-            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
-
+#segmented linear relationship model
 TP.seg <- segmented(linearModelVar6, seg.Z = ~ Q6,it.max=1000)
 #summary(tp.seg1)
 summary.seg6 = summary(TP.seg)
 summary.seg6
 
-TP.seg$psi
 #estimate bp which is already in the summary
+TP.seg$psi
+
 TPestbp <-summary.segmented(TP.seg)$psi [1,2]
 TPestbp
 
 TPestderror <- summary.segmented(TP.seg)$psi [1,3]
 slope(TP.seg)
+#confidence interval
 
 confint(TP.seg, 'Q6', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
         digits=max(4, getOption("digits") - 1))
@@ -104,7 +97,7 @@ ggplot(my.model6, aes(x=Q6, y=C6)) + geom_line()
 breakpointplot6=TPplot + geom_line(data = my.model6, aes(x = Q6, y = C6), colour = "red", size = 1.25)
 
 TPmy.lines <- TP.seg$psi[, 2]
-
+#create tiff file
 #tiff("blahTPplot1.tiff", width = 5, height =3, units = 'in', res = 600)
 TPplot1 <- breakpointplot6+geom_vline(xintercept=TPmy.lines,linetype="dashed", col ="red", size= 1)+
 xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(TP~(µmol~L^-1)))+
@@ -1585,24 +1578,3 @@ t6
 #################
 ```
 
-```
-
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
