@@ -1,0 +1,1608 @@
+---
+title: ""
+author: "Comparative Use of Hydrologic Indicators to Determine the Effects of Flow Regimes on Water Quality in Three Channels across Southern Florida, USA"
+date: "8/29/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+##############Shark River Slough######################################
+```{r}
+library(dbhydroR)
+library(dplyr)
+library(lubridate)
+library(ggplot2)
+library(segmented)
+#get and name water quality file from machine
+Srs3_TP = read.csv("SRS3-TP_mgl.csv", header =T)
+head(Srs3_TP)
+
+
+Srs3_TP = na.omit(Srs3_TP)
+attach(Srs3_TP)
+
+
+library(tidyverse)
+library(dplyr)
+library(segmented)
+library(ggplot2)
+#library(hrbrthemes)
+
+TP_F1= Srs3_TP
+TP_F1= mutate(TP_F1,
+  Discharge = Flow*0.0283 ,
+)
+head(TP_F1)
+
+TP_F1= mutate(TP_F1,
+  Q6 = log10(Discharge) ,
+  C6 = log10(TP)
+  
+)
+#remove the negative and zero rows
+TP_F1 = na.omit(TP_F1)
+head(TP_F1)
+attach(TP_F1)
+
+TPplot <- ggplot(TP_F1, aes(x= Q6, y= C6))+geom_point()
+TPplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar6 <- lm(C6 ~ Q6, TP_F1)
+#display linear model
+linearModelVar6
+summary(linearModelVar6)
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+TPdavies <- davies.test(linearModelVar6,seg.Z =~Q6,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+TPdavies 
+#########################
+
+pscore.test(linearModelVar6, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+TP.seg <- segmented(linearModelVar6, seg.Z = ~ Q6,it.max=1000)
+#summary(tp.seg1)
+summary.seg6 = summary(TP.seg)
+summary.seg6
+
+TP.seg$psi
+#estimate bp which is already in the summary
+TPestbp <-summary.segmented(TP.seg)$psi [1,2]
+TPestbp
+
+TPestderror <- summary.segmented(TP.seg)$psi [1,3]
+slope(TP.seg)
+
+confint(TP.seg, 'Q6', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+
+my.fitted6 <- fitted(TP.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model6 <- data.frame(Discharge=TP_F1$Q6, C6=my.fitted6)
+
+high.TP= subset(TP_F1, Q6 >= TP.seg$psi[2])
+low.TP <- subset(TP_F1,Q6 < TP.seg$psi[2])
+
+#anova
+
+TPlowaov1 <-aov(low.TP$C6 ~ low.TP$Q6, data = low.TP)
+summary(TPlowaov1)
+
+TPhighaov1 <-aov(high.TP$C6 ~ high.TP$Q6, data = high.TP)
+summary(TPhighaov1)
+
+TPplot <- ggplot(TP_F1,aes(x=Q6, y= C6))+
+  geom_point( aes( x=Q6, y= C6), color= 'black') #shape = temppch)
+TPplot
+
+
+ggplot(my.model6, aes(x=Q6, y=C6)) + geom_line()
+breakpointplot6=TPplot + geom_line(data = my.model6, aes(x = Q6, y = C6), colour = "red", size = 1.25)
+
+TPmy.lines <- TP.seg$psi[, 2]
+
+#tiff("blahTPplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+TPplot1 <- breakpointplot6+geom_vline(xintercept=TPmy.lines,linetype="dashed", col ="red", size= 1)+
+xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(TP~(µmol~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size= 1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 12,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 12,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-2, -1, 0, 1,2,3), labels =round(c(10^(-2),10^(-1), 10^(0),10^(1),10^(2),10^(3)), 3))+
+    scale_y_continuous(breaks =c(-1, -0.5, 0, 0.5, 1, 1.25), labels =round(c(10^(-1),10^(-0.5), 10^(0), 10^(0.5),10^(1),10^(1.25)),1))
+      #breaks=seq(0,100, by = 20)))
+  #text(x, y, labels)
+TPplot1  
+
+####################################################
+#select nitrate-nitrite
+Srs3_NN = read.csv("srs3_nn_f_new_mg_L_final_for_plot.csv", header = T)
+
+attach(Srs3_NN)
+head(Srs3_NN)
+
+Srs3_NN= mutate(Srs3_NN,
+  Discharge = Flow*0.0283 ,
+)
+
+head(Srs3_NN)
+NN_F = Srs3_NN 
+
+NN_F= mutate(PR_T_F,
+  TP = TP*0.031,
+  C= log10(TP)
+  )
+
+NN_F= mutate(NN_F,
+  Q1 = log10(Discharge) ,
+  C1 = log10(NN)
+  
+)
+
+NN_F = na.omit(NN_F)
+head(NN_F)
+attach(NN_F)
+
+#nnplot <- ggplot(datavar, aes(x=loggeddischarge, y= loggedtemp))+geom_point()
+nnplot <- ggplot(NN_F, aes(x= Q1, y= C1))+geom_point()
+nnplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar <- lm(C1 ~ Q1, NN_F)
+#display linear model
+summary(linearModelVar)
+
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+nndavies <- davies.test(linearModelVar,seg.Z =~Q1,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+nndavies 
+#########################
+
+pscore.test(linearModelVar, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+nn.seg <- segmented(linearModelVar, seg.Z = ~ Q1,it.max=1000)
+#summary(tp.seg1)
+summary.seg1 = summary(nn.seg)
+summary.seg1
+
+nn.seg$psi
+#estimate bp which is already in the summary
+nnestbp <-summary.segmented(nn.seg)$psi [1,2]
+nnestbp
+
+nnestderror <- summary.segmented(nn.seg)$psi [1,3]
+slope(nn.seg)
+
+confint(nn.seg, 'Q1', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+
+my.fitted1 <- fitted(nn.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model1 <- data.frame(Discharge=NN_F$Q1, C1=my.fitted1)
+
+high.nn= subset(NN_F, Q1 >= nn.seg$psi[2])
+low.nn <- subset(NN_F,Q1 < nn.seg$psi[2])
+
+#anova
+
+nnlowaov1 <-aov(low.nn$C1 ~ low.nn$Q1, data = low.nn)
+summary(nnlowaov1)
+
+nnhighaov1 <-aov(high.nn$C1 ~ high.nn$Q1, data = high.nn)
+summary(nnhighaov1)
+
+nnplot <- ggplot(NN_F,aes(Station, x=Q1, y= C1))+
+  geom_point( aes( x=Q1, y= C1), color= 'black') #shape = temppch)
+nnplot
+
+
+ggplot(my.model1, aes(x=Q1, y=C1)) + geom_line()
+breakpointplot1=nnplot + geom_line(data = my.model1, aes(x = Q1, y = C1), colour = "red", size = 1.25)
+
+nnmy.lines <- nn.seg$psi[, 2]
+
+
+tiff("NNfinalplot1_manuscipt.tiff", width = 5, height =3, units = 'in', res = 600)
+nnplot1 <- breakpointplot1+geom_vline(xintercept=nnmy.lines,linetype="dashed", col ="red", size= 1)+
+  #xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(NO[3]~(mg~L^-1)))+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(NN~(mg~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size=1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 11,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 11,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 11,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 11,  hjust = .5, vjust = .5, face = "plain"))+
+        #axis.text.x     = element_text(size = 8)
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-2, -1, 0, 1,2,3), labels =round(c(10^(-2),10^(-1), 10^(0),10^(1),10^(2),10^(3)), 3))+
+    scale_y_continuous(breaks = c(-3,-2, -1.0,  0.0, 1), labels =round(c(10^(-3), 10^(-2), 10^(-1.0), 10^(0.0), 10^(1.0)),3))
+    
+  #scale_y_continuous(breaks = c(0, 1, 1.5, 2), labels =round(c(10^(0), 10^(1), 10^(1.5), 10^(2)),2))                    
+nnplot1
+
+library(dbhydroR)
+Srs3_SpC= get_hydro(dbkey = "89870",
+         date_min = "2004-01-01", date_max = "2018-12-31")
+#write.csv(Srs3_SpC, file = "srs3_short_SpC.csv", row.names =F)
+Srs3_flow= get_hydro(dbkey = "89858",
+         date_min = "2004-01-01", date_max = "2018-12-31")
+attach(Srs3_flow)
+#write.csv(Srs3_flow, file = "srs3_short_flow.csv", row.names =F)
+
+#write.csv(S31_flow, file = "S31_flow_cleaned.csv",row.names =F)
+#attach(Srs3_SpC)
+head(Srs3_SpC)
+head(Srs3_flow)
+
+Srs3_flow = na.omit(Srs3_flow)
+
+attach(Srs3_flow)
+
+Srs3_SpC = na.omit(Srs3_SpC)
+attach(Srs3_SpC)
+
+Srs3_comb_SpC = merge(Srs3_flow, Srs3_SpC, by ="date")
+
+
+#MR_Con= rename(MR_Con, Specific_Conductivity_umhos_cm = RESULT)
+Srs3_comb_SpC= rename(Srs3_comb_SpC, SpC = "022908295_SCOND_uS/cm" )
+Srs3_comb_SpC= rename(Srs3_comb_SpC,Flow = '022908295_FLOW_cfs')
+#Srs3_comb_SpC
+#add more columns based on exisiting columns
+write.csv(Srs3_comb_SpC, file = "Srs3_comb_SpC.csv",row.names =F)
+
+ SpC_F =read.csv("Srs3_comb_SpC.csv", header =T)
+attach (SpC_F)
+head(SpC_F)
+
+SpC_F= mutate(SpC_F,
+  Discharge = Flow*0.0283 ,
+  
+)
+head(SpC_F)
+
+SpC_F= mutate(SpC_F,
+  Q9 = log10(Discharge) ,
+  C9 = log10(SpC)
+  
+)
+
+SpC_F = na.omit(SpC_F)
+SpC_F <- SpC_F[SpC_F$SpC > 0, ]
+SpC_F <- SpC_F[SpC_F$Discharge > 0, ]
+#Srs3_comb_Temp <- Srs3_comb_Temp[Srs3_comb_Temp$Flow > 0, ]
+
+head(SpC_F)
+attach(SpC_F)
+#write.csv(SpC_F, file = "SpC_F.csv",row.names =F)
+
+SpCplot <- ggplot(SpC_F, aes(x= Q9, y= C9))+geom_point()
+SpCplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar9 <- lm(C9 ~ Q9, SpC_F)
+#display linear model
+linearModelVar9
+summary(linearModelVar9)
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+SpCdavies <- davies.test(linearModelVar9,seg.Z =~Q9,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+SpCdavies 
+#########################
+
+pscore.test(linearModelVar9, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+SpC.seg <- segmented(linearModelVar9, seg.Z = ~ Q9,it.max=1000)
+#summary(SpC.seg1)
+summary.seg9= summary(SpC.seg)
+summary.seg9
+
+SpC.seg$psi
+#estimate bp which is already in the summary
+SpCestbp <-summary.segmented(SpC.seg)$psi [1,2]
+SpCestbp
+
+SpCestderror <- summary.segmented(SpC.seg)$psi [1,3]
+slope(SpC.seg)
+
+confint(SpC.seg, 'Q9', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+
+my.fitted9 <- fitted(SpC.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model9 <- data.frame(Discharge=SpC_F$Q9, C9=my.fitted9)
+
+high.SpC= subset(SpC_F, Q9 >= SpC.seg$psi[2])
+low.SpC <- subset(SpC_F,Q9 < SpC.seg$psi[2])
+
+#anova
+
+SpClowaov1 <-aov(low.SpC$C9 ~ low.SpC$Q9, data = low.SpC)
+summary(SpClowaov1)
+
+SpChighaov1 <-aov(high.SpC$C9 ~ high.SpC$Q9, data = high.SpC)
+summary(SpChighaov1)
+
+SpCplot <- ggplot(SpC_F,aes(x=Q9, y= C9))+
+  geom_point( aes( x=Q9, y= C9), color= 'black') #shape = temppch)
+SpCplot
+
+
+ggplot(my.model9, aes(x=Q9, y=C9)) + geom_line()
+breakpoint9=SpCplot + geom_line(data = my.model9, aes(x = Q9, y = C9), colour = "red", size = 1.25)
+
+SpCmy.lines <- SpC.seg$psi[, 2]
+tiff("S_review_SpCplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+SpCplot1 <- breakpoint9+geom_vline(xintercept=SpCmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(SC~(uS~cm^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size=1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 11,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 11,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 11,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 11,  hjust = .5, vjust = .5, face = "plain"))+
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-3,-2, -1, 0), labels =round(c(10^(-3),10^(-2), 10^(-1), 10^(0)),3))+
+    scale_y_continuous(breaks = c(2,3, 4, 5), labels =round(c(10^(2),10^(3),10^(4),10^(5)),))
+                      
+SpCplot1
+
+######################## Peace River################################
+NN_F = read.csv("prb_NN_F_final_noflag_no_dup.csv", header =T)
+attach(NN_F)
+NN_F = na.omit(NN_F)
+
+head(NN_F)
+
+#to convert from factor to date gonthough Posixit 
+#NN_F$Date<-strptime(Date,format="%m/%d/%Y") #defining what is the original format of your date
+#NN_F$Date<-as.Date(NN_F$Date,format="%m-%d-%Y") #defining what is the desired format of your date
+
+
+# subset POR for NN 2004 to 2018 daily average discharge
+#NN_F <- NN_F %>%
+        #filter(Date >= as.Date('2004-01-01') & Date <= as.Date('2018-12-31'))
+#attach(NN_F)
+
+
+#NNplot <- ggplot(datavar, aes(x=loggeddischarge, y= loggedtemp))+geom_point()
+NNplot <- ggplot(NN_F, aes(x= Q1, y= C1))+geom_point()
+NNplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+
+linearModelVar1 <- lm(C1 ~ Q1, NN_F)
+#display linear model
+summary(linearModelVar1)
+
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+NNdavies <- davies.test(linearModelVar1,seg.Z =~Q1,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+NNdavies 
+#########################
+
+pscore.test(linearModelVar1, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+nn.seg1 <- segmented(linearModelVar1, seg.Z = ~ Q1,it.max=1000)
+#summary(tp.seg1)
+summary.seg.nn = summary(nn.seg1)
+summary.seg.nn
+
+confint(nn.seg1, 'Q1', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+nn.seg1$psi
+#estimate bp which is already in the summary
+nnestbp1 <-summary.segmented(nn.seg1)$psi [1,2]
+nnestbp1
+
+nnestderror1 <- summary.segmented(nn.seg1)$psi [1,3]
+slope(nn.seg1)
+
+
+my.fitted2 <- fitted(nn.seg1)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model2 <- data.frame(Discharge=NN_F$Q1, C1=my.fitted2)
+
+high.nn= subset(NN_F, Q1 >= nn.seg1$psi[2])
+low.nn <- subset(NN_F,Q1 < nn.seg1$psi[2])
+
+#anova
+
+nnlowaov <-aov(low.nn$C1 ~ low.nn$Q1, data = low.nn)
+summary(nnlowaov)
+
+nnhighaov <-aov(high.nn$C1 ~ high.nn$Q1, data = high.nn)
+summary(nnhighaov)
+
+NNplot <- ggplot(NN_F,aes(Station, x=Q1, y= C1))+
+  geom_point(aes( x=Q1, y= C1), color= 'black') #shape = temppch)
+NNplot
+
+
+ggplot(my.model2, aes(x=Q1, y=C1)) + geom_line()
+breakpointplot2=NNplot + geom_line(data = my.model2, aes(x = Q1, y = C1), colour = "red", size = 1.25)
+
+nnmy.lines <- nn.seg1$psi[, 2]
+
+
+
+tiff("review_NNlot1_manuscript.tiff", width = 5, height =3, units = 'in', res = 600)
+nnplot1 <- breakpointplot2+geom_vline(xintercept=nnmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(NN~(mg~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size=1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 12,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 12,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+        #axis.text.x     = element_text(size = 8)
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-2, -1, 0, 1,2,3), labels =round(c(10^(-2),10^(-1), 10^(0),10^(1),10^(2),10^(3)), 3))+
+    scale_y_discrete(limits = c(-2, -1, 0,1), labels =round(c(10^(-2), 10^(-1),10^(0), 10^(1)),3))
+  #scale_y_discrete(limits = c(-2, -1.25, -0.5), labels =round(c(10^(-2), 10^(-1.25), 10^(-0.5)),2))  
+  #scale_y_continuous(breaks = c(0, 1, 1.5, 2), labels =round(c(10^(0), 10^(1), 10^(1.5), 10^(2)),2))                    
+nnplot1
+dev.off()
+t1 = (mean(Discharge)/mean(NN))* (sd(NN)/sd(Discharge))
+ 
+#t = CVc/CVq
+t1
+############################
+Cl_F = read.csv('prb_cl_f_short.csv', header =T)
+
+attach(Cl_F)
+Cl_F = na.omit(Cl_F)
+
+Cl_F$Date<-strptime(Date,format="%m/%d/%Y") #defining what is the original format of your date
+Cl_F$Date<-as.Date(Cl_F$Date,format="%m-%d-%Y") #d
+
+
+Cl_F <- Cl_F %>%
+        filter(Date >= as.Date('2004-01-01') & Date <= as.Date('2018-12-31'))
+head(Cl_F)
+attach(Cl_F)
+#Clplot <- ggplot(datavar, aes(x=loggeddischarge, y= loggedtemp))+geom_point()
+Clplot <- ggplot(Cl_F, aes(x= Q3, y= C3))+geom_point()
+Clplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar3 <- lm(C3 ~ Q3, Cl_F)
+#display linear model
+summary(linearModelVar3)
+
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+cldavies <- davies.test(linearModelVar3,seg.Z =~Q3,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+cldavies 
+#########################
+
+pscore.test(linearModelVar3, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+cl.seg <- segmented(linearModelVar3, seg.Z = ~ Q3,it.max=1000)
+#summary(tp.seg1)
+summary.seg3 = summary(cl.seg)
+summary.seg3
+
+confint(cl.seg , 'Q3', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+cl.seg$psi
+#estimate bp which is already in the summary
+clestbp <-summary.segmented(cl.seg)$psi [1,2]
+clestbp
+
+clestderror <- summary.segmented(cl.seg)$psi [1,3]
+slope(cl.seg)
+
+
+
+my.fitted3 <- fitted(cl.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model3 <- data.frame(Discharge=Cl_F$Q3, C3=my.fitted3)
+
+high.cl= subset(Cl_F, Q3 >= cl.seg$psi[2])
+low.cl <- subset(Cl_F,Q3 < cl.seg$psi[2])
+
+#anova
+
+cllowaov1 <-aov(low.cl$C3 ~ low.cl$Q3, data = low.cl)
+summary(cllowaov1)
+
+clhighaov1 <-aov(high.cl$C3 ~ high.cl$Q3, data = high.cl)
+summary(clhighaov1)
+
+Clplot <- ggplot(Cl_F,aes(Station, x=Q3, y= C3))+
+  geom_point( aes( x=Q3, y= C3), color= 'black') #shape = temppch)
+Clplot
+
+
+
+ggplot(my.model3, aes(x=Q3, y=C3)) + geom_line()
+breakpointplot3=Clplot + geom_line(data = my.model3, aes(x = Q3, y = C3), colour = "red", size = 1.25)
+
+clmy.lines <- cl.seg$psi[, 2]
+
+tiff("review_Clplot3.tiff", width = 5, height =4, units = 'in', res = 600)
+Clplot1 <- breakpointplot3+geom_vline(xintercept=clmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(Cl~(mg~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size=1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 12,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 12,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+        #axis.text.x     = element_text(size = 8)
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-1, 0, 1,2,3), labels =round(c(10^(-1), 10^(0), 10^(1), 10^(2), 10^(3)),2))+
+    scale_y_discrete(limits = c(1,2), labels =round(c( 10^(1), 10^(2))))
+  #scale_y_continuous(breaks = c(0, 1, 1.5, 2), labels =round(c(10^(0), 10^(1), 10^(1.5), 10^(2)),2))                    
+Clplot1
+dev.off()
+
+ 
+#t = CVc/CVq
+t3
+
+#############################################################
+tss_F = read.csv('prb_tss_f_short.csv', header =T)
+
+attach(tss_F)
+tss_F = na.omit(tss_F)
+
+tss_F$Date<-strptime(Date,format="%m/%d/%Y") #defining what is the original format of your date
+tss_F$Date<-as.Date(tss_F$Date,format="%m-%d-%Y") #d
+
+
+tss_F <- tss_F %>%
+        filter(Date >= as.Date('2004-01-01') & Date <= as.Date('2018-12-31'))
+attach(tss_F)
+head(tss_F)
+#duplicated(tss_F)
+#which(duplicated(tss_F))
+
+#tssplot <- ggplot(datavar, aes(x=loggeddischarge, y= loggedtemp))+geom_point()
+tssplot <- ggplot(tss_F, aes(x= Q4, y= C4))+geom_point()
+tssplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar4 <- lm(C4 ~ Q4, tss_F)
+#display linear model
+linearModelVar4
+summary(linearModelVar4)
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+tssdavies <- davies.test(linearModelVar4,seg.Z =~Q4,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+tssdavies 
+#########################
+
+pscore.test(linearModelVar4, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+tss.seg <- segmented(linearModelVar4, seg.Z = ~ Q4,it.max=1000)
+#summary(tp.seg1)
+summary.seg3 = summary(tss.seg)
+summary.seg3
+
+confint(tss.seg , 'Q4', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+tss.seg$psi
+#estimate bp which is already in the summary
+tssestbp <-summary.segmented(tss.seg)$psi [1,2]
+tssestbp
+
+tssestderror <- summary.segmented(tss.seg)$psi [1,3]
+slope(tss.seg)
+
+
+
+my.fitted4 <- fitted(tss.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model4 <- data.frame(Discharge=tss_F$Q4, C4=my.fitted4)
+
+high.tss= subset(tss_F, Q4 >= tss.seg$psi[2])
+low.tss <- subset(tss_F,Q4 < tss.seg$psi[2])
+
+#anova
+
+tsslowaov1 <-aov(low.tss$C4 ~ low.tss$Q4, data = low.tss)
+summary(tsslowaov1)
+
+tsshighaov1 <-aov(high.tss$C4 ~ high.tss$Q4, data = high.tss)
+summary(tsshighaov1)
+
+tssplot <- ggplot(tss_F,aes(x=Q4, y= C4))+
+  geom_point( aes( x=Q4, y= C4), color= 'black') #shape = temppch)
+tssplot
+
+
+ggplot(my.model4, aes(x=Q4, y=C4)) + geom_line()
+breakpointplot4=tssplot + geom_line(data = my.model4, aes(x = Q4, y = C4), colour = "red", size = 1.25)
+
+tssmy.lines <- tss.seg$psi[, 2]
+tiff("review_TSSplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+tssplot1 <- breakpointplot4+geom_vline(xintercept=tssmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(TSS~(mg~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size=1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 12,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 12,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+        #axis.text.x     = element_text(size = 8)
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-1, 0, 1,2,3), labels =round(c(10^(-1), 10^(0), 10^(1), 10^(2), 10^(3)),2))+
+    scale_y_discrete(limits= c(0,1, 2), labels =round(c(10^(0), 10^(1), 10^(2))))
+  #scale_y_continuous(breaks = c(0, 1, 1.5, 2), labels =round(c(10^(0), 10^(1), 10^(1.5), 10^(2)),2))                    
+tssplot1
+dev.off()
+
+######################################################
+```{r}
+TP_F = read.csv('prb_TP_F2.csv', header =T)
+
+attach(TP_F)
+
+TP_F = na.omit(TP_F)
+TP_F$Date<-strptime(Date,format="%m/%d/%Y") #defining what is the original format of your date
+TP_F$Date<-as.Date(TP_F$Date,format="%m-%d-%Y")
+
+TP_F <- TP_F %>%
+        filter(Date >= as.Date('2004-01-01') & Date <= as.Date('2018-12-31'))
+attach(TP_F)
+head(TP_F)
+#TPplot <- ggplot(datavar, aes(x=loggeddischarge, y= loggedtemp))+geom_point()
+TPplot <- ggplot(TP_F, aes(x= Q6, y= C6))+geom_point()
+TPplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar6 <- lm(C6 ~ Q6, TP_F)
+#display linear model
+linearModelVar6
+summary(linearModelVar6)
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+TPdavies <- davies.test(linearModelVar6,seg.Z =~Q6,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+TPdavies 
+#########################
+
+pscore.test(linearModelVar6, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+TP.seg <- segmented(linearModelVar6, seg.Z = ~ Q6,it.max=1000)
+#summary(tp.seg1)
+summary.seg6 = summary(TP.seg)
+summary.seg6
+
+confint(TP.seg , 'Q6', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+TP.seg$psi
+#estimate bp which is already in the summary
+TPestbp <-summary.segmented(TP.seg)$psi [1,2]
+TPestbp
+
+TPestderror <- summary.segmented(TP.seg)$psi [1,3]
+slope(TP.seg)
+
+
+
+my.fitted6 <- fitted(TP.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model6 <- data.frame(Discharge=TP_F$Q6, C6=my.fitted6)
+
+high.TP= subset(TP_F, Q6 >= TP.seg$psi[2])
+low.TP <- subset(TP_F,Q6 < TP.seg$psi[2])
+
+#anova
+
+TPlowaov1 <-aov(low.TP$C6 ~ low.TP$Q6, data = low.TP)
+summary(TPlowaov1)
+
+TPhighaov1 <-aov(high.TP$C6 ~ high.TP$Q6, data = high.TP)
+summary(TPhighaov1)
+
+TPplot <- ggplot(TP_F,aes(x=Q6, y= C6))+ 
+  geom_point( aes( x=Q6, y= C6), color= 'black') #shape = temppch)
+TPplot
+
+
+ggplot(my.model6, aes(x=Q6, y=C6)) + geom_line()
+breakpointplot6=TPplot + geom_line(data = my.model6, aes(x = Q6, y = C6), colour = "red", size = 1.25)
+
+TPmy.lines <- TP.seg$psi[, 2]
+#tiff("TPplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+TPplot1 <- breakpointplot6+geom_vline(xintercept=TPmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(TP~(mg~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size= 1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 12,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 12,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-2, -1, 0, 1,2,3), labels =round(c(10^(-2),10^(-1), 10^(0),10^(1),10^(2),10^(3)), 3))+
+    scale_y_continuous(breaks =c(-1, -0.5, 0, 0.5, 1), labels =round(c(10^(-1),10^(-0.5), 10^(0), 10^(0.5),10^(1)),1))
+      #breaks=seq(0,100, by = 20)))
+  #text(x, y, labels)
+TPplot1  
+#tiff("TPplot1.tiff", width = 4, height = 4, units = 'in', res = 600)
+#plot(x, y) # Make plot
+dev.off()
+
+#####################################################################
+SpC_F =read.csv("prb_spc_F.csv", header=T)
+#TP_F =TP_F[!duplicated(TP_F),]
+
+attach(SpC_F)
+SpC_F$Date<-strptime(Date,format="%m/%d/%Y") #defining what is the original format of your date
+SpC_F$Date<-as.Date(SpC_F$Date,format="%m-%d-%Y")
+
+SpC_F <- SpC_F %>%
+        filter(Date >= as.Date('2004-01-01') & Date <= as.Date('2018-12-31'))
+attach(SpC_F)
+head(SpC_F)
+#SpCplot <- ggplot(datavar, aes(x=loggeddischarge, y= loggedtemp))+geom_point()
+SpCplot <- ggplot(SpC_F, aes(x= Q9, y= C9))+geom_point()
+SpCplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar9 <- lm(C9 ~ Q9, SpC_F)
+#display linear model
+linearModelVar9
+summary(linearModelVar9)
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+SpCdavies <- davies.test(linearModelVar9,seg.Z =~Q9,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+SpCdavies 
+#########################
+
+pscore.test(linearModelVar9, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+SpC.seg <- segmented(linearModelVar9, seg.Z = ~ Q9,it.max=1000)
+#summary(SpC.seg1)
+summary.seg9= summary(SpC.seg)
+summary.seg9
+
+SpC.seg$psi
+#estimate bp which is already in the summary
+SpCestbp <-summary.segmented(SpC.seg)$psi [1,2]
+SpCestbp
+
+confint(SpC.seg , 'Q9', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+SpCestderror <- summary.segmented(SpC.seg)$psi [1,3]
+slope(SpC.seg)
+
+
+
+my.fitted9 <- fitted(SpC.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model9 <- data.frame(Discharge=SpC_F$Q9, C9=my.fitted9)
+
+high.SpC= subset(SpC_F, Q9 >= SpC.seg$psi[2])
+low.SpC <- subset(SpC_F,Q9 < SpC.seg$psi[2])
+
+#anova
+
+SpClowaov1 <-aov(low.SpC$C9 ~ low.SpC$Q9, data = low.SpC)
+summary(SpClowaov1)
+
+SpChighaov1 <-aov(high.SpC$C9 ~ high.SpC$Q9, data = high.SpC)
+summary(SpChighaov1)
+
+SpCplot <- ggplot(SpC_F,aes(x=Q9, y= C9))+
+  geom_point( aes( x=Q9, y= C9), color= 'black') #shape = temppch)
+SpCplot
+
+
+ggplot(my.model9, aes(x=Q9, y=C9)) + geom_line()
+breakpoint9=SpCplot + geom_line(data = my.model9, aes(x = Q9, y = C9), colour = "red", size = 1.25)
+
+SpCmy.lines <- SpC.seg$psi[, 2]
+tiff("Sreview_SpCplot2.tiff", width = 5, height =3, units = 'in', res = 600)
+SpCplot1 <- breakpoint9+geom_vline(xintercept=SpCmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(SC~(uS~cm^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size=1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 12,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 12,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-2, -1, 0, 1,2,3), labels =round(c(10^(-2), 10^(-1), 10^(0), 10^(1), 10^(2), 10^(3)),2))+
+    scale_y_continuous(breaks = c( 2.39794, 2.69897), labels =round(c (10^(2.39794),10^(2.69897))))
+                      
+SpCplot1
+
+#################################################################
+turb_F =read.csv("prb_turb_F.csv", header=T)
+#TP_F =TP_F[!duplicated(TP_F),]
+attach(turb_F)
+  
+#turb_F = na.omit(turb_F)
+
+turb_F$Date<-strptime(Date,format="%m/%d/%Y") #defining what is the original format of your date
+turb_F$Date<-as.Date(turb_F$Date,format="%m-%d-%Y")
+
+turb_F <- turb_F %>%
+        filter(Date >= as.Date('2004-01-01') & Date <= as.Date('2018-12-31'))
+attach(turb_F)
+head(turb_F)
+
+#turb_F = read.csv('prb_turb_F.csv', header =T)
+
+#turbplot <- ggplot(datavar, aes(x=loggeddischarge, y= loggedtemp))+geom_point()
+turbplot <- ggplot(turb_F, aes(x= Q8, y= C8))+geom_point()
+turbplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+
+linearModelVar8 <- lm(C8 ~ Q8, turb_F)
+#display linear model
+summary(linearModelVar8)
+
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+turbdavies <- davies.test(linearModelVar8,seg.Z =~Q8,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+turbdavies 
+#########################
+
+pscore.test(linearModelVar8, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+turb.seg1 <- segmented(linearModelVar8, seg.Z = ~ Q8,it.max=1000)
+#summary(tp.seg1)
+summary.seg.turb = summary(turb.seg1)
+summary.seg.turb
+
+confint(turb.seg1, 'Q8', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+turb.seg1$psi
+#estimate bp which is already in the summary
+turbestbp1 <-summary.segmented(turb.seg1)$psi [1,2]
+turbestbp1
+
+turbestderror1 <- summary.segmented(turb.seg1)$psi [1,3]
+slope(turb.seg1)
+
+
+
+
+my.fitted8 <- fitted(turb.seg1)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model8 <- data.frame(Discharge=turb_F$Q8, C8=my.fitted8)
+
+high.turb= subset(turb_F, Q8 >= turb.seg1$psi[2])
+low.turb <- subset(turb_F,Q8 < turb.seg1$psi[2])
+
+#anova
+
+turblowaov <-aov(low.turb$C8 ~ low.turb$Q8, data = low.turb)
+summary(turblowaov)
+
+turbhighaov <-aov(high.turb$C8 ~ high.turb$Q8, data = high.turb)
+summary(turbhighaov)
+
+turbplot <- ggplot(turb_F,aes(Station, x=Q8, y= C8))+
+  geom_point(aes( x=Q8, y= C8), color= 'black') #shape = temppch)
+turbplot
+
+
+ggplot(my.model8, aes(x=Q8, y=C8)) + geom_line()
+breakpointplot8=turbplot + geom_line(data = my.model8, aes(x = Q8, y = C8), colour = "red", size = 1.25)
+
+turbmy.lines <- turb.seg1$psi[, 2]
+
+
+
+tiff(" reviewturbplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+turbplot1 <- breakpointplot8+geom_vline(xintercept=turbmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(Turbidity~(NTU)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size=1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 12,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 12,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+        #axis.text.x     = element_text(size = 8)
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-2, -1, 0, 1,2,3), labels =round(c(10^(-2),10^(-1), 10^(0),10^(1),10^(2),10^(3)), 3))+
+    scale_y_discrete(limits = c(0, 1.0, 2), labels =round(c(10^(0), 10^(1.0), 10^(2))))
+    
+  #scale_y_continuous(breaks = c(0, 1, 1.5, 2), labels =round(c(10^(0), 10^(1), 10^(1.5), 10^(2)),2))                    
+turbplot1
+dev.off()
+
+
+################### Hillsboro Canal ##################################
+S6_TP = read.csv("S6_final_TP.csv", header =T)
+attach(S6_TP)
+S6_TP$date<-strptime(date,format="%m/%d/%Y")#defining what is the original format of your date
+S6_TP$date<-as.Date(S6_TP$date,format="%Y-%m-%d")
+S6_flow = read.csv("flowwithaveecolumnadded.csv", header =T)
+attach(S6_flow)
+#s6_flow =flowwithaveecolumnadded
+
+head(S6_flow)
+S6_flow$date<-strptime(date,format="%m/%d/%Y")
+S6_flow$date<-as.Date(S6_flow$date,format="%Y-%m-%d")
+
+S6_TP_combined = merge(S6_flow, S6_TP, by ="date")
+#S6_TP_combined= rename(S6_TP_combined, Flow = "S6_P_FLOW_cfs" )
+ 
+#S6_TP_combined = merge(S6_flow, S6_TP, by ="date")
+head(S6_TP_combined)
+
+TP_F= S6_TP_combined
+TP_F= S6_TP_combined
+TP_F= mutate(TP_F,
+  Discharge = Flow*0.0283 ,
+  
+)
+
+
+
+#log transformation 
+
+TP_F <- TP_F[TP_F$Discharge > 0, ]
+TP_F <- TP_F[TP_F$TP > 0, ]
+TP_F= mutate(TP_F,
+  Q6 = log10(Discharge) ,
+  C6 = log10(TP)
+
+)
+TP_F = na.omit(TP_F)
+
+attach (TP_F)
+head(TP_F)
+
+#Q6
+TPplot <- ggplot(TP_F, aes(x= Q6, y= C6))+geom_point()
+TPplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar6 <- lm(C6 ~ Q6, TP_F)
+#display linear model
+linearModelVar6
+summary(linearModelVar6)
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+TPdavies <- davies.test(linearModelVar6,seg.Z =~Q6,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+TPdavies 
+#########################
+
+pscore.test(linearModelVar6, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+TP.seg <- segmented(linearModelVar6, seg.Z = ~ Q6,it.max=1000)
+
+#summary(tp.seg1)
+summary.seg6 = summary(TP.seg)
+summary.seg6
+
+TP.seg$psi
+#estimate bp which is already in the summary
+TPestbp <-summary.segmented(TP.seg)$psi [1,2]
+TPestbp
+
+#confindence interval 95%
+confint(TP.seg)
+confint(TP.seg, 'Q6', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+TPestderror <- summary.segmented(TP.seg)$psi [1,3]
+slope(TP.seg)
+
+
+
+my.fitted6 <- fitted(TP.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model6 <- data.frame(Discharge=TP_F$Q6, C6=my.fitted6)
+
+high.TP= subset(TP_F, Q6 >= TP.seg$psi[2])
+low.TP <- subset(TP_F,Q6 < TP.seg$psi[2])
+
+#anova
+
+TPlowaov1 <-aov(low.TP$C6 ~ low.TP$Q6, data = low.TP)
+summary(TPlowaov1)
+
+TPhighaov1 <-aov(high.TP$C6 ~ high.TP$Q6, data = high.TP)
+summary(TPhighaov1)
+
+TPplot <- ggplot(TP_F,aes(x=Q6, y= C6))+
+  geom_point( aes( x=Q6, y= C6), color= 'black') #shape = temppch)
+TPplot
+
+
+
+ggplot(my.model6, aes(x=Q6, y=C6)) + geom_line()
+breakpointplot6=TPplot + geom_line(data = my.model6, aes(x = Q6, y = C6), colour = "red", size = 1.25)
+
+TPmy.lines <- TP.seg$psi[, 2]
+
+tiff("review_TPplot1_manu.tiff", width = 5, height =3, units = 'in', res = 600) #600dpi
+TPplot1 <- breakpointplot6+geom_vline(xintercept=TPmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(TP~(mg~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size= 1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 8,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 8,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 14,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 14,  hjust = .5, vjust = .5, face = "plain"))+
+    scale_x_continuous(breaks = c(-3,-2, -1, 0, 1,2,3), labels =round(c(10^(-3),10^(-2),10^(-1), 10^(0),10^(1),10^(2),10^(3)), 3))+
+       scale_y_discrete(limits=c(-2,-1,0,1), labels =round(c(10^(-2),10^(-1),10^(0), 10^(1)),2)) 
+ 
+TPplot1 
+
+NNplot <- ggplot(NN_F, aes(x= Q1, y= C1))+geom_point()
+NNplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+
+linearModelVar1 <- lm(C1 ~ Q1, NN_F)
+#display linear model
+summary(linearModelVar1)
+
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+NNdavies <- davies.test(linearModelVar1,seg.Z =~Q1,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+NNdavies 
+##################################################################
+
+pscore.test(linearModelVar1, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+nn.seg1 <- segmented(linearModelVar1, seg.Z = ~ Q1,it.max=1000)
+#summary(tp.seg1)
+summary.seg.nn = summary(nn.seg1)
+summary.seg.nn
+
+confint(nn.seg1, 'Q1', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+nn.seg1$psi
+#estimate bp which is already in the summary
+nnestbp1 <-summary.segmented(nn.seg1)$psi [1,2]
+nnestbp1
+
+nnestderror1 <- summary.segmented(nn.seg1)$psi [1,3]
+slope(nn.seg1)
+
+
+my.fitted2 <- fitted(nn.seg1)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model2 <- data.frame(Discharge=NN_F$Q1, C1=my.fitted2)
+
+high.nn= subset(NN_F, Q1 >= nn.seg1$psi[2])
+low.nn <- subset(NN_F,Q1 < nn.seg1$psi[2])
+
+#anova
+
+nnlowaov <-aov(low.nn$C1 ~ low.nn$Q1, data = low.nn)
+summary(nnlowaov)
+
+nnhighaov <-aov(high.nn$C1 ~ high.nn$Q1, data = high.nn)
+summary(nnhighaov)
+
+NNplot <- ggplot(NN_F,aes(Station, x=Q1, y= C1))+
+  geom_point(aes( x=Q1, y= C1), color= 'black') #shape = temppch)
+NNplot
+
+
+ggplot(my.model2, aes(x=Q1, y=C1)) + geom_line()
+breakpointplot2=NNplot + geom_line(data = my.model2, aes(x = Q1, y = C1), colour = "red", size = 1.25)
+
+nnmy.lines <- nn.seg1$psi[, 2]
+
+
+#tiff("NNplot1yes.tiff", width = 5, height =3, units = 'in', res = 600)
+
+#tiff("NNplot_manu.tiff", width = 5, height =3, units = 'in', res = 600) #600dpi
+tiff("review_nn_final.tiff", width = 5, height =3, units = 'in', res = 600)
+nnplot1 <- breakpointplot2+geom_vline(xintercept=nnmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(NN~(mg~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size= 1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 8,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 8,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 14,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 14,  hjust = .5, vjust = .5, face = "plain"))+
+   scale_x_continuous(breaks = c(-1,0, 1,2 ), labels =round(c(10^(-1),10^(0),10^(1),10^(2)),3))+
+    scale_y_continuous(breaks =c(-2, -1, 0,1), labels =round(c(10^(-2), 10^(-1), 10^(0), 10^(1)),2))
+  
+nnplot1
+
+########################################################
+S6_turb = read.csv("s6_turb.csv", header =T)
+attach(S6_turb)
+S6_turb$date<-strptime(date,format="%m/%d/%Y")#defining what is the original format of your date
+S6_turb$date<-as.Date(S6_turb$date,format="%Y-%m-%d") #defining what is the desired format of your date
+
+head(S6_flow)
+S6_turb_combined = merge(S6_flow, S6_turb, by ="date")
+#S6_turb_combined= rename(S6_turb_combined, Flow = "S6_P_FLOW_cfs" )
+
+
+#S6_turb_combined = merge(S6_flow, S6_turb, by ="date")
+head(S6_turb_combined)
+
+turb_F= S6_turb_combined
+turb_F= S6_turb_combined
+turb_F= mutate(turb_F,
+  Discharge = Flow*0.0283 ,
+  
+)
+head(turb_F)
+
+
+turb_F <- turb_F[turb_F$Discharge > 0, ]
+turb_F <- turb_F[turb_F$Turb > 0, ]
+turb_F= mutate(turb_F,
+  Q8 = log10(Discharge) ,
+  C8 = log10(Turb)
+
+)
+turb_F = na.omit(turb_F)
+attach (turb_F)
+head(turb_F)
+turbplot <- ggplot(turb_F, aes(x= Q8, y= C8))+geom_point()
+turbplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+
+linearModelVar8 <- lm(C8 ~ Q8, turb_F)
+#display linear model
+summary(linearModelVar8)
+
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+turbdavies <- davies.test(linearModelVar8,seg.Z =~Q8,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+turbdavies 
+#########################
+
+pscore.test(linearModelVar8, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+turb.seg1 <- segmented(linearModelVar8, seg.Z = ~ Q8,it.max=1000)
+#summary(tp.seg1)
+summary.seg.turb = summary(turb.seg1)
+summary.seg.turb
+
+confint(turb.seg1, 'Q8', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+turb.seg1$psi
+#estimate bp which is already in the summary
+turbestbp1 <-summary.segmented(turb.seg1)$psi [1,2]
+turbestbp1
+
+turbestderror1 <- summary.segmented(turb.seg1)$psi [1,3]
+slope(turb.seg1)
+
+
+
+
+my.fitted8 <- fitted(turb.seg1)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model8 <- data.frame(Discharge=turb_F$Q8, C8=my.fitted8)
+
+high.turb= subset(turb_F, Q8 >= turb.seg1$psi[2])
+low.turb <- subset(turb_F,Q8 < turb.seg1$psi[2])
+
+#anova
+
+turblowaov <-aov(low.turb$C8 ~ low.turb$Q8, data = low.turb)
+summary(turblowaov)
+
+turbhighaov <-aov(high.turb$C8 ~ high.turb$Q8, data = high.turb)
+summary(turbhighaov)
+
+turbplot <- ggplot(turb_F,aes(Station, x=Q8, y= C8))+
+  geom_point(aes( x=Q8, y= C8), color= 'black') #shape = temppch)
+turbplot
+
+
+ggplot(my.model8, aes(x=Q8, y=C8)) + geom_line()
+breakpointplot8=turbplot + geom_line(data = my.model8, aes(x = Q8, y = C8), colour = "red", size = 1.25)
+
+turbmy.lines <- turb.seg1$psi[, 2]
+
+
+
+tiff("reviewturbplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+turbplot1 <- breakpointplot8+geom_vline(xintercept=turbmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(Turbidity~(NTU)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size= 1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 8,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 8,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 14,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 14,  hjust = .5, vjust = .5, face = "plain"))+
+   
+#require(scales)
+#turbplot1  + scale_x_continuous(labels = comma)
+scale_x_continuous(breaks = c(-3,-2, -1, 0, 1,2,3), labels =round(c(10^(-3),10^(-2),10^(-1), 10^(0),10^(1),10^(2),10^(3)), 3))+
+       scale_y_discrete(limits = c(0, 1, 2), labels =round(c(10^(0),  10^(1), 10^(2)),1))
+ 
+turbplot1
+
+######################
+S6_Cl = read.csv("S6_cl.csv", header =T)
+attach(S6_Cl)
+S6_Cl$date<-strptime(date,format="%m/%d/%Y")#defining what is the original format of your date
+S6_Cl$date<-as.Date(S6_Cl$date,format="%Y-%m-%d") #defining what is the desired format of your date
+S6_Cl_combined = merge(S6_flow, S6_Cl, by ="date")
+head(S6_Cl_combined)
+
+Cl_F= S6_Cl_combined
+Cl_F= S6_Cl_combined
+Cl_F= mutate(Cl_F,
+  Discharge = Flow*0.0283 ,
+  
+)
+head(Cl_F)
+Cl_F <- Cl_F[Cl_F$Discharge > 0, ]
+Cl_F <- Cl_F[Cl_F$Cl > 0, ]
+Cl_F= mutate(Cl_F,
+  Q6 = log10(Discharge) ,
+  C6 = log10(Cl)
+
+)
+Cl_F = na.omit(Cl_F)
+attach (Cl_F)
+head(Cl_F)
+
+
+```
+```{r}
+Clplot <- ggplot(Cl_F, aes(x= Q6, y= C6))+geom_point()
+Clplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar6 <- lm(C6 ~ Q6, Cl_F)
+#display linear model
+linearModelVar6
+summary(linearModelVar6)
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+Cldavies <- davies.test(linearModelVar6,seg.Z =~Q6,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+Cldavies 
+#########################
+
+pscore.test(linearModelVar6, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+Cl.seg <- segmented(linearModelVar6, seg.Z = ~ Q6,it.max=1000)
+
+#summary(Cl.seg1)
+summary.seg6 = summary(Cl.seg)
+summary.seg6
+
+Cl.seg$psi
+#estimate bp which is already in the summary
+Clestbp <-summary.segmented(Cl.seg)$psi [1,2]
+Clestbp
+
+#confindence interval 95%
+confint(Cl.seg)
+confint(Cl.seg, 'Q6', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+Clestderror <- summary.segmented(Cl.seg)$psi [1,3]
+slope(Cl.seg)
+
+
+
+my.fitted6 <- fitted(Cl.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model6 <- data.frame(Discharge=Cl_F$Q6, C6=my.fitted6)
+
+high.Cl= subset(Cl_F, Q6 >= Cl.seg$psi[2])
+low.Cl <- subset(Cl_F,Q6 < Cl.seg$psi[2])
+
+#anova
+
+Cllowaov1 <-aov(low.Cl$C6 ~ low.Cl$Q6, data = low.Cl)
+summary(Cllowaov1)
+
+Clhighaov1 <-aov(high.Cl$C6 ~ high.Cl$Q6, data = high.Cl)
+summary(Clhighaov1)
+
+Clplot <- ggplot(Cl_F,aes(x=Q6, y= C6))+
+  geom_point( aes( x=Q6, y= C6), color= 'black') #shape = temppch)
+Clplot
+
+
+
+ggplot(my.model6, aes(x=Q6, y=C6)) + geom_line()
+breakpoinCllot6=Clplot + geom_line(data = my.model6, aes(x = Q6, y = C6), colour = "red", size = 1.25)
+
+Clmy.lines <- Cl.seg$psi[, 2]
+
+#tiff("Clplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+Clplot1 <- breakpoinCllot6+geom_vline(xintercept=Clmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(Cl~(mgL^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size= 1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 8,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 8,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+   scale_x_continuous(breaks = c(-2,-1, 0, 1,2,3), labels =round(c(10^(-2),10^(-1), 10^(0), 10^(1), 10^(2), 10^(3)),2))+
+    scale_y_discrete(limits = c(0,1, 2, 3), labels =round(c(10^(0), 10^(1), 10^(2), 10^(3)),1))
+Clplot1 
+#scale_y_discrete(limits = c(0, 1, 2), labels =round(c(10^(0),  10^(1), 10^(2)),1))
+#t6 = (mean(Discharge)/mean(Cl))* (sd(Cl)/sd(Discharge))
+ 
+#t = CVc/CVq
+t6
+###################################
+S6_SpC = read.csv("s6_final_spc.csv", header =T)
+attach(S6_SpC)
+S6_SpC$date<-strptime(date,format="%m/%d/%Y")#defining what is the original format of your date
+S6_SpC$date<-as.Date(S6_SpC$date,format="%Y-%m-%d") #defining what is the desired format of your date
+head(S6_flow)
+S6_SpC_combined = merge(S6_flow, S6_SpC, by ="date")
+head(S6_SpC_combined)
+
+SpC_F= S6_SpC_combined
+SpC_F= S6_SpC_combined
+SpC_F= mutate(SpC_F,
+  Discharge = Flow*0.0283 ,
+  
+)
+
+SpC_F <- SpC_F[SpC_F$Discharge > 0, ]
+SpC_F <- SpC_F[SpC_F$SpC > 0, ]
+SpC_F= mutate(SpC_F,
+  Q9 = log10(Discharge) ,
+  C9 = log10(SpC)
+
+)
+SpC_F = na.omit(SpC_F)
+attach (SpC_F)
+head(SpC_F)
+attach(SpC_F)
+SpCplot <- ggplot(SpC_F, aes(x= Q9, y= C9))+geom_point()
+SpCplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar9 <- lm(C9 ~ Q9, SpC_F)
+#display linear model
+linearModelVar9
+summary(linearModelVar9)
+# Davies test for significant breakpoint
+#turbdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+SpCdavies <- davies.test(linearModelVar9,seg.Z =~Q9,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+SpCdavies 
+#########################
+
+pscore.test(linearModelVar9, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+SpC.seg <- segmented(linearModelVar9, seg.Z = ~ Q9,it.max=1000)
+#summary(SpC.seg1)
+summary.seg9= summary(SpC.seg)
+summary.seg9
+
+SpC.seg$psi
+#estimate bp which is already in the summary
+SpCestbp <-summary.segmented(SpC.seg)$psi [1,2]
+SpCestbp
+
+confint(SpC.seg , 'Q9', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+SpCestderror <- summary.segmented(SpC.seg)$psi [1,3]
+slope(SpC.seg)
+
+
+
+my.fitted9 <- fitted(SpC.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedturbidity=my.fitted)
+my.model9 <- data.frame(Discharge=SpC_F$Q9, C9=my.fitted9)
+
+high.SpC= subset(SpC_F, Q9 >= SpC.seg$psi[2])
+low.SpC <- subset(SpC_F,Q9 < SpC.seg$psi[2])
+
+#anova
+
+SpClowaov1 <-aov(low.SpC$C9 ~ low.SpC$Q9, data = low.SpC)
+summary(SpClowaov1)
+
+SpChighaov1 <-aov(high.SpC$C9 ~ high.SpC$Q9, data = high.SpC)
+summary(SpChighaov1)
+
+SpCplot <- ggplot(SpC_F,aes(x=Q9, y= C9))+
+  geom_point( aes( x=Q9, y= C9), color= 'black') #shape = temppch)
+SpCplot
+
+
+ggplot(my.model9, aes(x=Q9, y=C9)) + geom_line()
+breakpoint9=SpCplot + geom_line(data = my.model9, aes(x = Q9, y = C9), colour = "red", size = 1.25)
+
+SpCmy.lines <- SpC.seg$psi[, 2]
+tiff("review_SpCplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+SpCplot1 <- breakpoint9+geom_vline(xintercept=SpCmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(SC~(uS~cm^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size= 1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 8,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 8,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 14,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 14,  hjust = .5, vjust = .5, face = "plain"))+
+  #transfomrm scale  back to normal and round to two decimal places
+  scale_x_continuous(breaks = c(-3, -2, -1, 0, 1,2,3), labels =round(c(10^(-3), 10^(-2), 10^(-1), 10^(0), 10^(1), 10^(2), 10^(3)),2))+
+  scale_y_continuous(breaks = c( 2.69897,3,3.30103), labels =round(c(10^(2.69897),10^(3), 10^(3.30103))))  
+  #scale_y_discrete(limits = c(2.75,3, 3.25), labels =round(c(10^(2.75),10^(3),10^(3.25)),0))
+#(10^(2.5),10^(2.75),10^(3), 10^(3.25)
+#scale_y_discrete(limits = c(0,1, 2, 3), labels =round(c(10^(0), 10^(1), 10^(2), 10^(3)),1))
+                      
+SpCplot1
+
+t6 = (mean(Discharge)/mean(SpC))* (sd(SpC)/sd(Discharge))
+ 
+#t = CVc/CVq
+t6
+
+S6_TSS = read.csv("s6_final_tss.csv", header =T)
+attach(S6_TSS)
+S6_TSS$date<-strptime(date,format="%m/%d/%Y")#defining what is the original format of your date
+S6_TSS$date<-as.Date(S6_TSS$date,format="%Y-%m-%d") #defining what is the desired format of your date
+head(S6_flow)
+S6_TSS_combined = merge(S6_flow, S6_TSS, by ="date")
+head(S6_TSS_combined)
+
+TSS_F= S6_TSS_combined
+TSS_F= S6_TSS_combined
+TSS_F= mutate(TSS_F,
+  Discharge = Flowbyav*0.0283 ,
+  
+)
+
+TSS_F <- TSS_F[TSS_F$Discharge > 0, ]
+TSS_F <- TSS_F[TSS_F$TSS > 0, ]
+TSS_F= mutate(TSS_F,
+  Q6 = log10(Discharge) ,
+  C6 = log10(TSS)
+
+)
+TSS_F = na.omit(TSS_F)
+attach (TSS_F)
+head(TSS_F)
+```
+```{r}
+TSSplot <- ggplot(TSS_F, aes(x= Q6, y= C6))+geom_point()
+TSSplot
+# linear model
+#linearModelVar <- lm(loggedtemp ~ loggeddischarge, datavar)
+linearModelVar6 <- lm(C6 ~ Q6, TSS_F)
+#display linear model
+linearModelVar6
+summary(linearModelVar6)
+# Davies test for significant breakpoint
+#TSSdavies <- davies.test(linearModelVar,seg.Z =~loggeddischarge,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+TSSdavies <- davies.test(linearModelVar6,seg.Z =~Q6,k=10,alternative=c("two.sided","less","greater"), values=NULL,dispersion=NULL)
+TSSdavies 
+#########################
+
+pscore.test(linearModelVar6, k = 10, alternative = c("two.sided", "less", "greater"),
+            values=NULL, dispersion=NULL, df.t=NULL, more.break=FALSE)
+
+TSS.seg <- segmented(linearModelVar6, seg.Z = ~ Q6,it.max=1000)
+
+#summary(TSS.seg1)
+summary.seg6 = summary(TSS.seg)
+summary.seg6
+
+TSS.seg$psi
+#estimate bp which is already in the summary
+TSSestbp <-summary.segmented(TSS.seg)$psi [1,2]
+TSSestbp
+
+#confindence interval 95%
+confint(TSS.seg)
+confint(TSS.seg, 'Q6', level=0.95, rev.sgn=FALSE, var.diff=FALSE,
+        digits=max(4, getOption("digits") - 1))
+
+TSSestderror <- summary.segmented(TSS.seg)$psi [1,3]
+slope(TSS.seg)
+
+
+
+my.fitted6 <- fitted(TSS.seg)
+#my.model <- data.frame(discharge=datavar$loggeddischarge, loggedTSSidity=my.fitted)
+my.model6 <- data.frame(Discharge=TSS_F$Q6, C6=my.fitted6)
+
+high.TSS= subset(TSS_F, Q6 >= TSS.seg$psi[2])
+low.TSS <- subset(TSS_F,Q6 < TSS.seg$psi[2])
+
+#anova
+
+TSSlowaov1 <-aov(low.TSS$C6 ~ low.TSS$Q6, data = low.TSS)
+summary(TSSlowaov1)
+
+TSShighaov1 <-aov(high.TSS$C6 ~ high.TSS$Q6, data = high.TSS)
+summary(TSShighaov1)
+
+TSSplot <- ggplot(TSS_F,aes(x=Q6, y= C6))+
+  geom_point( aes( x=Q6, y= C6), color= 'black') #shape = temppch)
+TSSplot
+
+    
+
+ggplot(my.model6, aes(x=Q6, y=C6)) + geom_line()
+breakpoinTSSlot6=TSSplot + geom_line(data = my.model6, aes(x = Q6, y = C6), colour = "red", size = 1.25)
+
+TSSmy.lines <- TSS.seg$psi[, 2]
+
+#tiff("new_TSSplot1.tiff", width = 5, height =3, units = 'in', res = 600)
+TSSplot1 <- breakpoinTSSlot6+geom_vline(xintercept=TSSmy.lines,linetype="dashed", col ="red", size= 1)+
+  xlab(expression(Discharge~(m^3~s^-1)))+ylab(expression(TSS~(mg~L^-1)))+
+  theme(panel.border =  element_rect(color = "black", fill = NA, size= 1),
+        panel.background=element_blank(), panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), legend.position="top")+
+  theme(axis.text.x = element_text(color = "grey20", size = 8,  hjust = .5, vjust = .5, face = "plain"),
+        axis.text.y = element_text(color = "grey20", size = 8,  hjust = 1, vjust = 0, face = "plain"),  
+        axis.title.x = element_text(color = "grey20", size = 16,  hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "grey20", size = 16,  hjust = .5, vjust = .5, face = "plain"))+
+   scale_x_continuous(breaks = c(-3,-2,-1.5, 0, 1,2), labels =round(c(10^(-3), 10^(-2),10^(-1.5), 10^(0), 10^(1), 10^(2)),2))+
+    scale_y_continuous(breaks = c(0.5,1, 1.5,2), labels =round(c(10^(0.5), 10^(1), 10^(1.5), 10^(2)),2))
+TSSplot1 
+
+t6 = (mean(Discharge)/mean(TSS))* (sd(TSS)/sd(Discharge))
+ 
+#t = CVc/CVq
+t6
+
+#################
+```
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
