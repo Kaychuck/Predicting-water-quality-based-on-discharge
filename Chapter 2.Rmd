@@ -1552,10 +1552,6 @@ TSSplot1 <- breakpoinTSSlot6+geom_vline(xintercept=TSSmy.lines,linetype="dashed"
     scale_y_continuous(breaks = c(0.5,1, 1.5,2), labels =round(c(10^(0.5), 10^(1), 10^(1.5), 10^(2)),2))
 TSSplot1 
 
-t6 = (mean(Discharge)/mean(TSS))* (sd(TSS)/sd(Discharge))
- 
-#t = CVc/CVq
-t6
 
 #################
 ```
