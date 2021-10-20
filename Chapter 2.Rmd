@@ -5,7 +5,6 @@ date: "8/29/2021"
 output: html_document
 ---
 
-```
 ###Three channels include: Shark River Slough, Peace River and Hillsboro Canal####
 ##############Shark River Slough######################################
 ```{r}
